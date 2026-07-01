@@ -1,4 +1,5 @@
 const SAMPLE_RATE = 24000;
+const SCHEDULE_LEAD_S = 0.03;
 
 const els = {
   serverUrl: document.getElementById("serverUrl"),
@@ -73,9 +74,13 @@ function parseFrames(buffer) {
   return { frames, remainder: buffer.slice(offset) };
 }
 
-function scheduleChunk(floats, startTime) {
+function scheduleChunk(floats, nextPlayTime) {
   const buffer = audioContext.createBuffer(1, floats.length, SAMPLE_RATE);
   buffer.copyToChannel(floats, 0);
+
+  // Never schedule in the past: after a long GPU wait, stale nextPlayTime
+  // causes Web Audio to start every chunk immediately (overlap).
+  const startTime = Math.max(nextPlayTime, audioContext.currentTime + SCHEDULE_LEAD_S);
 
   const source = audioContext.createBufferSource();
   source.buffer = buffer;
@@ -91,6 +96,10 @@ function apiBaseUrl() {
   return configured || window.location.origin;
 }
 
+function logClientMetrics(metrics) {
+  console.info("[tts-metrics]", metrics);
+}
+
 async function streamAndPlay() {
   resetPlayback();
   abortController = new AbortController();
@@ -101,7 +110,7 @@ async function streamAndPlay() {
     ref_audio_path: els.refAudioPath.value.trim(),
     ref_text: els.refText.value.trim(),
     max_chars: Number(els.maxChars.value) || 120,
-    "nfe-step": Number(els.nfeStep.value) || 32,
+    "nfe-step": Number(els.nfeStep.value) || 16,
   };
 
   if (!payload.text) {
@@ -117,25 +126,33 @@ async function streamAndPlay() {
   await audioContext.resume();
 
   const startedAt = performance.now();
-  let nextPlayTime = audioContext.currentTime + 0.05;
+  let nextPlayTime = audioContext.currentTime + SCHEDULE_LEAD_S;
   let chunkCount = 0;
   let totalSamples = 0;
   let pending = new Uint8Array(0);
+  let firstChunkAt = null;
+  const chunkArrivalTimes = [];
 
   try {
+    const fetchStart = performance.now();
     const response = await fetch(`${baseUrl}/tts/stream`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Request-Id": `web-${Date.now()}`,
+      },
       body: JSON.stringify(payload),
       signal: abortController.signal,
     });
+
+    const headersReceivedAt = performance.now();
 
     if (!response.ok) {
       throw new Error(`Server returned ${response.status} ${response.statusText}`);
     }
 
     const reader = response.body.getReader();
-    setStatus("Generating first chunk… (this can take a minute on CPU/MPS)", "busy");
+    setStatus("Generating first chunk…", "busy");
 
     while (true) {
       const { done, value } = await reader.read();
@@ -148,15 +165,27 @@ async function streamAndPlay() {
       pending = remainder;
 
       for (const frame of frames) {
+        const arrivalAt = performance.now();
+        if (firstChunkAt === null) {
+          firstChunkAt = arrivalAt;
+        }
+        chunkArrivalTimes.push({
+          index: chunkCount + 1,
+          arrivalMs: arrivalAt - startedAt,
+          samples: frame.length,
+          audioSeconds: frame.length / SAMPLE_RATE,
+        });
+
         chunkCount += 1;
         totalSamples += frame.length;
         nextPlayTime = scheduleChunk(frame, nextPlayTime);
 
         const elapsed = ((performance.now() - startedAt) / 1000).toFixed(1);
         const duration = (totalSamples / SAMPLE_RATE).toFixed(1);
+        const ttft = firstChunkAt ? ((firstChunkAt - startedAt) / 1000).toFixed(1) : "?";
         els.meterFill.style.width = `${Math.min(95, 10 + chunkCount * 20)}%`;
         setStatus(
-          `Playing chunk ${chunkCount} · ${duration}s audio · ${elapsed}s elapsed`,
+          `Chunk ${chunkCount} · TTFT ${ttft}s · ${duration}s audio · ${elapsed}s elapsed`,
           "busy",
         );
       }
@@ -168,8 +197,24 @@ async function streamAndPlay() {
 
     const totalDuration = (totalSamples / SAMPLE_RATE).toFixed(1);
     const elapsed = ((performance.now() - startedAt) / 1000).toFixed(1);
+    const ttft = ((firstChunkAt - startedAt) / 1000).toFixed(1);
+    const ttfb = ((headersReceivedAt - fetchStart) / 1000).toFixed(1);
+
     els.meterFill.style.width = "100%";
-    setStatus(`Done · ${chunkCount} chunk(s) · ${totalDuration}s audio · ${elapsed}s total`, "done");
+    setStatus(
+      `Done · ${chunkCount} chunk(s) · ${totalDuration}s audio · TTFT ${ttft}s · ${elapsed}s total`,
+      "done",
+    );
+
+    logClientMetrics({
+      ttfbSeconds: Number(ttfb),
+      ttftSeconds: Number(ttft),
+      totalSeconds: Number(elapsed),
+      totalAudioSeconds: Number(totalDuration),
+      chunkCount,
+      nfeStep: payload["nfe-step"],
+      chunkArrivals: chunkArrivalTimes,
+    });
   } catch (error) {
     if (error.name === "AbortError") {
       setStatus("Stopped.", "idle");

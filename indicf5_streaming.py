@@ -43,6 +43,9 @@ class StreamChunk:
     text: str
     audio: np.ndarray
     sample_rate: int = target_sample_rate
+    cfm_seconds: float = 0.0
+    vocoder_seconds: float = 0.0
+    gen_seconds: float = 0.0
 
 
 def _default_device() -> str:
@@ -151,6 +154,7 @@ class IndicF5Session:
         if not chunks:
             chunks = [text.strip()]
         total = len(chunks)
+        stream_t0 = time.perf_counter()
 
         self.ema_model.to(self.device)
         self.vocoder.to(self.device)
@@ -198,15 +202,22 @@ class IndicF5Session:
                 f"cfm.sample={cfm_elapsed:.3f}s "
                 f"vocoder.decode={voc_elapsed:.3f}s "
                 f"total={chunk_elapsed:.3f}s "
+                f"since_stream_start={time.perf_counter() - stream_t0:.3f}s "
+                f"audio_s={len(audio_np) / target_sample_rate:.2f} "
                 f"nfe_step={nfe_step} "
                 f"chars={len(gen_text)}"
             )
+            if index == 0:
+                _log_timing(f"ttft_stream={time.perf_counter() - stream_t0:.3f}s (first chunk ready)")
 
             yield StreamChunk(
                 index=index,
                 total=total,
                 text=gen_text,
                 audio=audio_np,
+                cfm_seconds=cfm_elapsed,
+                vocoder_seconds=voc_elapsed,
+                gen_seconds=chunk_elapsed,
             )
 
 

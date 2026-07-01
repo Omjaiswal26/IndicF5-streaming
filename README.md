@@ -160,6 +160,22 @@ python tts_server.py --host 0.0.0.0 --port 8000 --device cuda --nfe-step 16
 
 `pod_verify` logs: transformers/torch/CUDA checks, weight load report (`ema missing=0 unexpected=0`), and audio stats (`rms`, `peak`, no all-`-1`).
 
+### TTFT and metrics
+
+**TTFT** (time to first audio chunk) ≈ first `cfm.sample()` time (~2–4s @ nfe=16 on 4090, ~3–5s @ nfe=32). Dominated by diffusion steps, not vocoder.
+
+| Tool | What it measures |
+|------|------------------|
+| Server stderr `[timing] ttft_stream=…` | GPU: first chunk ready inside `IndicF5Session` |
+| Server stderr `[metrics] ttft=…` | HTTP: first byte yielded to client |
+| Browser console `[tts-metrics]` | Client TTFT, TTFB, per-chunk arrival times |
+| `python scripts/benchmark_ttft.py` | Pure GPU path (no RunPod proxy buffering) |
+| `POST /tts/benchmark` | JSON timing per chunk (no audio streamed) |
+
+**Lower TTFT:** use **nfe=16**, smaller `max_chars`, fewer chunks. UI default is now 16.
+
+**Overlapping audio** was a frontend bug: chunks scheduled with stale `nextPlayTime` after a long wait all started at once. Fixed in `web/app.js` via `Math.max(nextPlayTime, audioContext.currentTime)`.
+
 ---
 
 ## Pitfalls and troubleshooting
