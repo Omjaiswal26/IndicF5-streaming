@@ -41,17 +41,69 @@
             <input id="refAudioPath" type="text" value="reference/amitabh_voice.wav" />
           </div>
           <div class="field">
-            <label for="nfeStep">NFE steps</label>
-            <select id="nfeStep">
-              <option value="16" selected>16 (faster)</option>
-              <option value="32">32 (default quality)</option>
+            <label for="latencyPreset">Latency preset</label>
+            <select id="latencyPreset">
+              <option value="custom">Custom</option>
+              <option value="low" selected>Low latency (fastest first audio)</option>
+              <option value="balanced">Balanced</option>
+              <option value="quality">Quality (slowest TTFT)</option>
             </select>
           </div>
         </div>
 
-        <div class="field">
-          <label for="maxChars">Max chars per chunk</label>
-          <input id="maxChars" type="number" min="40" max="300" value="120" />
+        <details class="latency-panel" open>
+          <summary>TTFT tuning (time to first audio chunk)</summary>
+          <p class="hint">
+            <strong>TTFT</strong> is dominated by the first diffusion pass (<code>cfm.sample</code>).
+            Lower <strong>NFE steps</strong> and a smaller <strong>first chunk</strong> (max chars) reduce
+            wait time. The UI request overrides the server <code>--nfe-step</code> CLI flag unless you
+            check “use server default”.
+          </p>
+          <ul class="hint-list">
+            <li><strong>NFE 8</strong> — ~half CFM time vs 16; slight quality loss.</li>
+            <li><strong>Max chars 40–60</strong> — shorter first chunk → fewer mel frames → lower TTFT.</li>
+            <li><strong>Server CLI</strong> — <code>--nfe-step 8</code> only applies when UI uses server default.</li>
+          </ul>
+          <p id="serverDefaults" class="hint server-defaults">Server default NFE: loading…</p>
+        </details>
+
+        <div class="row">
+          <div class="field">
+            <label for="nfeStep">NFE steps (diffusion)</label>
+            <select id="nfeStep">
+              <option value="8" selected>8 — lowest latency</option>
+              <option value="12">12 — fast</option>
+              <option value="16">16 — balanced</option>
+              <option value="32">32 — best quality</option>
+            </select>
+            <p class="field-hint">Sent in the request body; overrides server CLI unless “use server default” is checked.</p>
+          </div>
+          <div class="field">
+            <label for="maxCharsPreset">Max chars per chunk</label>
+            <select id="maxCharsPreset">
+              <option value="40">40 — lowest TTFT</option>
+              <option value="60" selected>60 — low latency</option>
+              <option value="80">80 — balanced</option>
+              <option value="120">120 — fewer chunks</option>
+              <option value="custom">Custom…</option>
+            </select>
+            <input
+              id="maxChars"
+              type="number"
+              min="30"
+              max="300"
+              value="60"
+              class="max-chars-custom hidden"
+            />
+            <p class="field-hint">Smaller chunks = faster first audio, more chunk boundaries.</p>
+          </div>
+        </div>
+
+        <div class="field checkbox-field">
+          <label class="checkbox-label">
+            <input id="useServerNfe" type="checkbox" />
+            Use server default NFE (<span id="serverNfeInline">…</span>) — ignore dropdown above
+          </label>
         </div>
 
         <div class="actions">

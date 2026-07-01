@@ -1,19 +1,31 @@
 const SAMPLE_RATE = 24000;
 const SCHEDULE_LEAD_S = 0.03;
 
+const LATENCY_PRESETS = {
+  low: { nfeStep: 8, maxChars: 60, maxCharsPreset: "60" },
+  balanced: { nfeStep: 16, maxChars: 80, maxCharsPreset: "80" },
+  quality: { nfeStep: 32, maxChars: 120, maxCharsPreset: "120" },
+};
+
 const els = {
   serverUrl: document.getElementById("serverUrl"),
   text: document.getElementById("text"),
   refText: document.getElementById("refText"),
   refAudioPath: document.getElementById("refAudioPath"),
+  latencyPreset: document.getElementById("latencyPreset"),
   nfeStep: document.getElementById("nfeStep"),
+  maxCharsPreset: document.getElementById("maxCharsPreset"),
   maxChars: document.getElementById("maxChars"),
+  useServerNfe: document.getElementById("useServerNfe"),
+  serverDefaults: document.getElementById("serverDefaults"),
+  serverNfeInline: document.getElementById("serverNfeInline"),
   generateBtn: document.getElementById("generateBtn"),
   stopBtn: document.getElementById("stopBtn"),
   status: document.getElementById("status"),
   meterFill: document.getElementById("meterFill"),
 };
 
+let serverDefaultNfe = 16;
 let audioContext = null;
 let abortController = null;
 let scheduledSources = [];
@@ -78,8 +90,6 @@ function scheduleChunk(floats, nextPlayTime) {
   const buffer = audioContext.createBuffer(1, floats.length, SAMPLE_RATE);
   buffer.copyToChannel(floats, 0);
 
-  // Never schedule in the past: after a long GPU wait, stale nextPlayTime
-  // causes Web Audio to start every chunk immediately (overlap).
   const startTime = Math.max(nextPlayTime, audioContext.currentTime + SCHEDULE_LEAD_S);
 
   const source = audioContext.createBufferSource();
@@ -96,8 +106,85 @@ function apiBaseUrl() {
   return configured || window.location.origin;
 }
 
+function resolvedMaxChars() {
+  if (els.maxCharsPreset.value === "custom") {
+    return Math.min(300, Math.max(30, Number(els.maxChars.value) || 60));
+  }
+  return Number(els.maxCharsPreset.value);
+}
+
+function syncMaxCharsInputVisibility() {
+  const isCustom = els.maxCharsPreset.value === "custom";
+  els.maxChars.classList.toggle("hidden", !isCustom);
+}
+
+function applyLatencyPreset(presetKey) {
+  if (presetKey === "custom") {
+    return;
+  }
+  const preset = LATENCY_PRESETS[presetKey];
+  if (!preset) {
+    return;
+  }
+  els.nfeStep.value = String(preset.nfeStep);
+  els.maxCharsPreset.value = preset.maxCharsPreset;
+  els.maxChars.value = String(preset.maxChars);
+  syncMaxCharsInputVisibility();
+}
+
+function markCustomPreset() {
+  els.latencyPreset.value = "custom";
+}
+
+function updateServerNfeDisplay() {
+  const label = String(serverDefaultNfe);
+  els.serverNfeInline.textContent = label;
+  els.serverDefaults.textContent =
+    `Server default NFE: ${label} (from --nfe-step or tts_server.py default). ` +
+    `Effective NFE for next request: ${effectiveNfeLabel()}.`;
+}
+
+function effectiveNfeLabel() {
+  if (els.useServerNfe.checked) {
+    return `server default (${serverDefaultNfe})`;
+  }
+  return els.nfeStep.value;
+}
+
+function buildPayload() {
+  const payload = {
+    text: els.text.value.trim(),
+    ref_audio_path: els.refAudioPath.value.trim(),
+    ref_text: els.refText.value.trim(),
+    max_chars: resolvedMaxChars(),
+  };
+
+  if (!els.useServerNfe.checked) {
+    payload["nfe-step"] = Number(els.nfeStep.value);
+  }
+
+  return payload;
+}
+
 function logClientMetrics(metrics) {
   console.info("[tts-metrics]", metrics);
+}
+
+async function fetchServerDefaults() {
+  try {
+    const res = await fetch(`${apiBaseUrl()}/health`);
+    if (!res.ok) {
+      return;
+    }
+    const data = await res.json();
+    if (typeof data.default_nfe_step === "number") {
+      serverDefaultNfe = data.default_nfe_step;
+      updateServerNfeDisplay();
+    }
+  } catch (_) {
+    els.serverDefaults.textContent = "Server default NFE: unknown (could not reach /health)";
+    els.serverNfeInline.textContent = "?";
+  }
 }
 
 async function streamAndPlay() {
@@ -105,13 +192,7 @@ async function streamAndPlay() {
   abortController = new AbortController();
 
   const baseUrl = apiBaseUrl();
-  const payload = {
-    text: els.text.value.trim(),
-    ref_audio_path: els.refAudioPath.value.trim(),
-    ref_text: els.refText.value.trim(),
-    max_chars: Number(els.maxChars.value) || 120,
-    "nfe-step": Number(els.nfeStep.value) || 16,
-  };
+  const payload = buildPayload();
 
   if (!payload.text) {
     setStatus("Please enter text to synthesize.", "error");
@@ -120,7 +201,10 @@ async function streamAndPlay() {
 
   setBusy(true);
   els.meterFill.style.width = "8%";
-  setStatus("Connecting to server…", "busy");
+  setStatus(
+    `Connecting… (nfe=${effectiveNfeLabel()}, max_chars=${payload.max_chars})`,
+    "busy",
+  );
 
   audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
   await audioContext.resume();
@@ -146,6 +230,7 @@ async function streamAndPlay() {
     });
 
     const headersReceivedAt = performance.now();
+    const responseNfe = response.headers.get("X-NFE-Step");
 
     if (!response.ok) {
       throw new Error(`Server returned ${response.status} ${response.statusText}`);
@@ -212,7 +297,10 @@ async function streamAndPlay() {
       totalSeconds: Number(elapsed),
       totalAudioSeconds: Number(totalDuration),
       chunkCount,
-      nfeStep: payload["nfe-step"],
+      maxChars: payload.max_chars,
+      nfeStepRequested: payload["nfe-step"] ?? `server-default(${serverDefaultNfe})`,
+      nfeStepResponseHeader: responseNfe,
+      useServerNfe: els.useServerNfe.checked,
       chunkArrivals: chunkArrivalTimes,
     });
   } catch (error) {
@@ -238,6 +326,27 @@ function stopPlayback() {
   setStatus("Stopped.", "idle");
 }
 
+els.latencyPreset.addEventListener("change", () => {
+  applyLatencyPreset(els.latencyPreset.value);
+  updateServerNfeDisplay();
+});
+
+els.nfeStep.addEventListener("change", () => {
+  markCustomPreset();
+  updateServerNfeDisplay();
+});
+
+els.maxCharsPreset.addEventListener("change", () => {
+  markCustomPreset();
+  syncMaxCharsInputVisibility();
+  if (els.maxCharsPreset.value !== "custom") {
+    els.maxChars.value = els.maxCharsPreset.value;
+  }
+});
+
+els.maxChars.addEventListener("input", markCustomPreset);
+els.useServerNfe.addEventListener("change", updateServerNfeDisplay);
+
 els.generateBtn.addEventListener("click", streamAndPlay);
 els.stopBtn.addEventListener("click", stopPlayback);
 
@@ -245,4 +354,9 @@ if (window.location.protocol !== "file:") {
   els.serverUrl.placeholder = window.location.origin;
 }
 
-setStatus('Ready. Click "Generate & Play" to stream audio from the server.', "idle");
+applyLatencyPreset("low");
+syncMaxCharsInputVisibility();
+fetchServerDefaults();
+updateServerNfeDisplay();
+
+setStatus('Ready. "Low latency" preset selected (NFE 8, max 60 chars). Click Generate & Play.', "idle");

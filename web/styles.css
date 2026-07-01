@@ -169,3 +169,76 @@ button:disabled {
   background: linear-gradient(90deg, #2dd4bf, #22d3ee);
   transition: width 0.25s ease;
 }
+
+.hint,
+.field-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #94a3b8;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.hint code,
+.field-hint code {
+  font-size: 0.8rem;
+  color: #5eead4;
+}
+
+.hint-list {
+  margin: 0.5rem 0 0.75rem;
+  padding-left: 1.2rem;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.latency-panel {
+  margin-bottom: 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.55);
+}
+
+.latency-panel summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin-bottom: 0.35rem;
+}
+
+.server-defaults {
+  margin-top: 0.5rem;
+  color: #5eead4;
+}
+
+.checkbox-field {
+  margin-bottom: 0.5rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #cbd5e1;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+
+.checkbox-label input {
+  width: auto;
+}
+
+.hidden {
+  display: none;
+}
+
+.max-chars-custom {
+  margin-top: 0.5rem;
+}

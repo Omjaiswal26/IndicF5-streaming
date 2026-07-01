@@ -38,7 +38,7 @@ class TTSRequest(BaseModel):
     ref_audio_path: str
     ref_text: str
     max_chars: int = 120
-    nfe_step: int = Field(default=DEFAULT_NFE_STEP, alias="nfe-step")
+    nfe_step: Optional[int] = Field(default=None, alias="nfe-step")
 
     model_config = {"populate_by_name": True}
 
