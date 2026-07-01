@@ -31,24 +31,13 @@
         </div>
 
         <div class="field">
-          <label for="refText">Reference transcript</label>
-          <textarea id="refText" rows="3">लहरों से डर कर नौका पार नहीं होती, कोशिश करने वालों की कभी हार नहीं होती। नन्हीं चींटी जब दाना लेकर चलती है, चढ़ती दीवारों पर सौ बार फिसलती है।</textarea>
-        </div>
-
-        <div class="row">
-          <div class="field">
-            <label for="refAudioPath">Reference audio path (on server)</label>
-            <input id="refAudioPath" type="text" value="reference/amitabh_voice.wav" />
-          </div>
-          <div class="field">
-            <label for="latencyPreset">Latency preset</label>
-            <select id="latencyPreset">
-              <option value="custom">Custom</option>
-              <option value="low" selected>Low latency (fastest first audio)</option>
-              <option value="balanced">Balanced</option>
-              <option value="quality">Quality (slowest TTFT)</option>
-            </select>
-          </div>
+          <label for="latencyPreset">Latency preset</label>
+          <select id="latencyPreset">
+            <option value="custom">Custom</option>
+            <option value="low" selected>Low latency (fastest first audio)</option>
+            <option value="balanced">Balanced</option>
+            <option value="quality">Quality (slowest TTFT)</option>
+          </select>
         </div>
 
         <details class="latency-panel" open>

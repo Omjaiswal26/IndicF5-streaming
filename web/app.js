@@ -1,6 +1,10 @@
 const SAMPLE_RATE = 24000;
 const SCHEDULE_LEAD_S = 0.03;
 
+const DEFAULT_REF_AUDIO_PATH = "reference/amitabh_voice.wav";
+const DEFAULT_REF_TEXT =
+  "लहरों से डर कर नौका पार नहीं होती, कोशिश करने वालों की कभी हार नहीं होती। नन्हीं चींटी जब दाना लेकर चलती है, चढ़ती दीवारों पर सौ बार फिसलती है।";
+
 const LATENCY_PRESETS = {
   low: { nfeStep: 8, maxChars: 60, maxCharsPreset: "60" },
   balanced: { nfeStep: 16, maxChars: 80, maxCharsPreset: "80" },
@@ -10,8 +14,6 @@ const LATENCY_PRESETS = {
 const els = {
   serverUrl: document.getElementById("serverUrl"),
   text: document.getElementById("text"),
-  refText: document.getElementById("refText"),
-  refAudioPath: document.getElementById("refAudioPath"),
   latencyPreset: document.getElementById("latencyPreset"),
   nfeStep: document.getElementById("nfeStep"),
   maxCharsPreset: document.getElementById("maxCharsPreset"),
@@ -154,8 +156,8 @@ function effectiveNfeLabel() {
 function buildPayload() {
   const payload = {
     text: els.text.value.trim(),
-    ref_audio_path: els.refAudioPath.value.trim(),
-    ref_text: els.refText.value.trim(),
+    ref_audio_path: DEFAULT_REF_AUDIO_PATH,
+    ref_text: DEFAULT_REF_TEXT,
     max_chars: resolvedMaxChars(),
   };
 
