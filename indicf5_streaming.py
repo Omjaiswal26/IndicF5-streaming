@@ -11,8 +11,8 @@ from typing import Generator, Iterator, Optional, Tuple
 import numpy as np
 import torch
 import torchaudio
-from transformers import AutoModel
 
+from indicf5_load import LoadReport, load_indicf5_models
 from f5_tts.infer.utils_infer import (
     cfg_strength,
     convert_char_to_pinyin,
@@ -68,14 +68,24 @@ class IndicF5Session:
         self.model_id = model_id
         self.device = device or _default_device()
         self._ref_cache: dict[RefCacheKey, RefConditioning] = {}
+        self.load_report: Optional[LoadReport] = None
 
-        _log_timing(f"loading model {model_id} on {self.device}")
-        t0 = time.perf_counter()
-        hf_model = AutoModel.from_pretrained(model_id, trust_remote_code=True)
-        self._hf_model = hf_model.to(self.device)
-        self.ema_model = self._hf_model.ema_model
-        self.vocoder = self._hf_model.vocoder
-        _log_timing(f"model ready in {time.perf_counter() - t0:.3f}s")
+        _log_timing(f"loading model {model_id} on {self.device} (direct checkpoint load)")
+        self.ema_model, self.vocoder, self.load_report = load_indicf5_models(
+            model_id=model_id,
+            device=self.device,
+        )
+        if self.load_report.weights_ok:
+            _log_timing(
+                f"model ready in {self.load_report.load_seconds:.3f}s "
+                f"ema_keys={self.load_report.ema_keys_loaded}"
+            )
+        else:
+            _log_timing(
+                f"model loaded with weight errors in {self.load_report.load_seconds:.3f}s "
+                f"missing={len(self.load_report.ema_missing)} "
+                f"unexpected={len(self.load_report.ema_unexpected)}"
+            )
 
     def clear_ref_cache(self) -> None:
         self._ref_cache.clear()

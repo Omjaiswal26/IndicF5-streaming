@@ -56,6 +56,7 @@ This repo adds true **sentence/chunk-level streaming** without modifying HF `mod
 
 | File | Purpose |
 |------|---------|
+| `indicf5_load.py` | Direct checkpoint load (`load_model` + `load_vocoder`), bypasses `AutoModel` |
 | `indicf5_streaming.py` | `IndicF5Session` — caches ref audio, streams one chunk at a time via `CFM.sample()` + `vocoder.decode()` |
 | `tts_server.py` | FastAPI server + web test UI at `/` |
 | `web/` | Browser UI for streaming TTS |
@@ -140,6 +141,24 @@ python tts_server.py --host 0.0.0.0 --port 8000 --device cuda --nfe-step 16
 Open RunPod **Connect → HTTP port 8000** proxy URL in your browser.
 
 Optional: `export HF_HOME=/workspace/hf-cache` to persist model downloads on a volume.
+
+### `pod` branch (recommended for RunPod)
+
+The **`pod`** branch bypasses `AutoModel.from_pretrained` and loads IndicF5 weights directly via `indicf5_load.py` (fixes `_orig_mod` checkpoint key mismatch → garbage/all-`-1` audio).
+
+```bash
+git fetch origin && git checkout pod && git pull origin pod
+bash scripts/pod_run.sh
+```
+
+Or step-by-step:
+
+```bash
+python scripts/pod_verify.py --device cuda --output /tmp/pod_verify.wav
+python tts_server.py --host 0.0.0.0 --port 8000 --device cuda --nfe-step 16
+```
+
+`pod_verify` logs: transformers/torch/CUDA checks, weight load report (`ema missing=0 unexpected=0`), and audio stats (`rms`, `peak`, no all-`-1`).
 
 ---
 
