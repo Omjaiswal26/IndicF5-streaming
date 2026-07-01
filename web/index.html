@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IndicF5 Streaming TTS Test</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <h1>IndicF5 Streaming TTS</h1>
+        <p>Test chunk-level speech synthesis against your local FastAPI server.</p>
+      </header>
+
+      <main class="card">
+        <div class="field">
+          <label for="serverUrl">Server URL</label>
+          <input id="serverUrl" type="url" value="http://localhost:8000" />
+        </div>
+
+        <div class="field">
+          <label for="text">Text to synthesize</label>
+          <textarea id="text">ਜ਼ਿੰਦਗੀ ਵਿੱਚ ਕਾਮਯਾਬੀ ਉਹਨਾਂ ਲੋਕਾਂ ਨੂੰ ਮਿਲਦੀ ਹੈ ਜੋ ਮੁਸ਼ਕਲਾਂ ਤੋਂ ਨਹੀਂ ਡਰਦੇ।
+ਹਰ ਨਵਾਂ ਦਿਨ ਇੱਕ ਨਵਾਂ ਮੌਕਾ ਲੈ ਕੇ ਆਉਂਦਾ ਹੈ।</textarea>
+        </div>
+
+        <div class="field">
+          <label for="refText">Reference transcript</label>
+          <textarea id="refText" rows="3">लहरों से डर कर नौका पार नहीं होती, कोशिश करने वालों की कभी हार नहीं होती। नन्हीं चींटी जब दाना लेकर चलती है, चढ़ती दीवारों पर सौ बार फिसलती है।</textarea>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="refAudioPath">Reference audio path (on server)</label>
+            <input id="refAudioPath" type="text" value="reference/amitabh_voice.wav" />
+          </div>
+          <div class="field">
+            <label for="nfeStep">NFE steps</label>
+            <select id="nfeStep">
+              <option value="16">16 (faster)</option>
+              <option value="32" selected>32 (default)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="maxChars">Max chars per chunk</label>
+          <input id="maxChars" type="number" min="40" max="300" value="120" />
+        </div>
+
+        <div class="actions">
+          <button id="generateBtn" type="button">Generate &amp; Play</button>
+          <button id="stopBtn" type="button" disabled>Stop</button>
+        </div>
+
+        <div id="status" class="status idle">
+          Ready. Click "Generate &amp; Play" to stream audio from the server.
+        </div>
+        <div class="meter"><div id="meterFill" class="meter-fill"></div></div>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
