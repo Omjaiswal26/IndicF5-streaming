@@ -147,10 +147,15 @@ class IndicF5Session:
         ref_text: str,
         max_chars: int = 120,
         nfe_step: int = 32,
+        split: bool = True,
     ) -> Iterator[StreamChunk]:
         """Yield each synthesized chunk as soon as CFM + vocoder finish for it."""
         ref = self._get_ref_conditioning(ref_audio_path, ref_text)
-        chunks = split_text(text, max_chars=max_chars)
+        if split:
+            chunks = split_text(text, max_chars=max_chars)
+        else:
+            stripped = text.strip()
+            chunks = [stripped] if stripped else []
         if not chunks:
             chunks = [text.strip()]
         total = len(chunks)

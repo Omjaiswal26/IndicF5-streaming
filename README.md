@@ -178,6 +178,50 @@ python tts_server.py --host 0.0.0.0 --port 8000 --device cuda --nfe-step 16
 
 ---
 
+## LiveKit Agents integration
+
+Use **`POST /v1/tts/synthesize`** from your LiveKit agents project (STT/LLM stay in LiveKit).
+
+| Feature | `/v1/tts/synthesize` | `/tts/stream` (web UI) |
+|---------|----------------------|-------------------------|
+| Body | `{"text": "..."}` only (ref from server defaults) | framed float32 + optional split |
+| Audio format | **pcm_s16le** @ 24 kHz, raw stream | uint32 length + float32 frames |
+| `split` default | **false** (one sentence per call) | **true** |
+| Client disconnect | Stops streaming between chunks | Same |
+
+**Server defaults** (env or CLI):
+
+```bash
+export INDICF5_REF_AUDIO=reference/amitabh_voice.wav
+export INDICF5_REF_TEXT="..."
+python tts_server.py --default-ref-audio reference/amitabh_voice.wav --nfe-step 8
+```
+
+**Readiness:** `GET /ready` → 503 until model weights loaded.
+
+**LiveKit plugin:** copy `integrations/livekit_indicf5.py` into your agents repo:
+
+```python
+from integrations.livekit_indicf5 import IndicF5TTS
+
+AgentSession(
+    stt=...,
+    llm=...,
+    tts=IndicF5TTS(base_url="http://indicf5:8000", nfe_step=8),
+)
+```
+
+**curl test:**
+
+```bash
+curl -N -X POST http://localhost:8000/v1/tts/synthesize \
+  -H "Content-Type: application/json" \
+  -d '{"text":"ਨਮਸਤੇ, ਕੀ ਹਾਲ ਹੈ?"}' \
+  --output /tmp/livekit_test.pcm
+```
+
+---
+
 ## Pitfalls and troubleshooting
 
 ### 1. Pin `transformers<4.50` (critical on CUDA pods)
