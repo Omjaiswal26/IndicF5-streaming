@@ -86,11 +86,16 @@ function scheduleChunk(floats, startTime) {
   return startTime + buffer.duration;
 }
 
+function apiBaseUrl() {
+  const configured = els.serverUrl.value.trim().replace(/\/$/, "");
+  return configured || window.location.origin;
+}
+
 async function streamAndPlay() {
   resetPlayback();
   abortController = new AbortController();
 
-  const baseUrl = els.serverUrl.value.replace(/\/$/, "");
+  const baseUrl = apiBaseUrl();
   const payload = {
     text: els.text.value.trim(),
     ref_audio_path: els.refAudioPath.value.trim(),
@@ -190,5 +195,9 @@ function stopPlayback() {
 
 els.generateBtn.addEventListener("click", streamAndPlay);
 els.stopBtn.addEventListener("click", stopPlayback);
+
+if (window.location.protocol !== "file:") {
+  els.serverUrl.placeholder = window.location.origin;
+}
 
 setStatus('Ready. Click "Generate & Play" to stream audio from the server.', "idle");

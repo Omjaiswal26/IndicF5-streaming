@@ -10,13 +10,18 @@
     <div class="page">
       <header>
         <h1>IndicF5 Streaming TTS</h1>
-        <p>Test chunk-level speech synthesis against your local FastAPI server.</p>
+        <p>Test chunk-level speech synthesis against the FastAPI server serving this page.</p>
       </header>
 
       <main class="card">
         <div class="field">
           <label for="serverUrl">Server URL</label>
-          <input id="serverUrl" type="url" value="http://localhost:8000" />
+          <input
+            id="serverUrl"
+            type="url"
+            value=""
+            placeholder="Leave empty to use this page's URL (recommended on RunPod)"
+          />
         </div>
 
         <div class="field">
